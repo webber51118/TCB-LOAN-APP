@@ -1,0 +1,5 @@
+{
+  "name": "TCB Policy Loan Smart Assistant",
+  "description": "A Muji-style intelligent customer service assistant for Taiwan Cooperative Bank, specialized in individual policy loans based on the 114.12 regulations.",
+  "requestFramePermissions": []
+}
