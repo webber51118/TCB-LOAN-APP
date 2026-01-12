@@ -34,28 +34,39 @@ const App = () => {
   const [messages, setMessages] = useState([{ 
     id: '1', 
     role: 'assistant', 
-    content: '您好，我是合庫貸款助手。\n\n請點擊右上角 **[上傳]** 按鈕，選擇 **114.12 版規章輯要 (.docx)** 檔案後，即可開始針對具體條款進行諮詢。', 
+    content: '您好，我是合庫貸款助手。\n\n請點擊右上角 **[上傳]** 按鈕，選擇 **114.12 版規章輯要 (.docx)** 檔案後，即可開始諮詢。', 
     timestamp: new Date() 
   }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [isStandalone, setIsStandalone] = useState(false);
+  const [pwaStatus, setPwaStatus] = useState('checking'); // checking, ready, installed
   const fileInputRef = useRef(null);
   const scrollRef = useRef(null);
 
   useEffect(() => {
-    // 檢查是否已在桌面模式
+    // 監測是否已經安裝
     if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
-      setIsStandalone(true);
+      setPwaStatus('installed');
     }
 
     const handler = (e) => {
+      console.log('PWA Install Prompt Ready');
       e.preventDefault();
       setDeferredPrompt(e);
+      setPwaStatus('ready');
     };
     window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    
+    // 如果 3 秒後都沒觸發 ready，顯示引導
+    const timer = setTimeout(() => {
+      if (pwaStatus === 'checking') setPwaStatus('not_detected');
+    }, 3000);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -66,9 +77,12 @@ const App = () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') setDeferredPrompt(null);
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+        setPwaStatus('installed');
+      }
     } else {
-      alert("請點擊 Chrome 右上角 [⋮] 選單，選擇「安裝應用程式」或「新增至主畫面」。");
+      alert("⚠️ 安裝環境尚未準備好。\n請確保使用 Chrome 瀏覽器，並嘗試重新整理頁面。若仍無效，請點擊選單中的「安裝應用程式」或「新增至主畫面」。");
     }
   };
 
@@ -79,9 +93,9 @@ const App = () => {
     try {
       const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
       setKnowledgeBase(result.value);
-      setMessages(prev => [...prev, { id: 'sys-'+Date.now(), role: 'assistant', content: `✅ **${file.name}** 已載入。\n\n我現在將嚴格遵守 114.12 版規章內容為您解答。請問您想了解哪類貸款？`, timestamp: new Date() }]);
+      setMessages(prev => [...prev, { id: 'sys-'+Date.now(), role: 'assistant', content: `✅ **${file.name}** 已載入。\n\n請問您想了解哪類貸款？`, timestamp: new Date() }]);
     } catch (err) {
-      alert("讀取 .docx 失敗，請確保檔案未加密且格式正確。");
+      alert("讀取 .docx 失敗。");
     } finally {
       setIsLoading(false);
       e.target.value = null;
@@ -101,13 +115,13 @@ const App = () => {
         model: "gemini-3-flash-preview",
         contents: [...messages.slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] })), { role: 'user', parts: [{ text: input }] }],
         config: { 
-          systemInstruction: TCB_SYSTEM_PROMPT + "\n以下為規章文本內容，請以此為唯一依據：\n" + knowledgeBase,
+          systemInstruction: TCB_SYSTEM_PROMPT + "\n以下為規章內容：\n" + knowledgeBase,
           temperature: 0.1
         }
       });
       setMessages(prev => [...prev, { id: 'bot-'+Date.now(), role: 'assistant', content: response.text, timestamp: new Date() }]);
     } catch (err) {
-      setMessages(prev => [...prev, { id: 'err-'+Date.now(), role: 'assistant', content: "⚠️ AI 連線發生錯誤，請確認網路環境或 API Key 是否正確。", timestamp: new Date() }]);
+      setMessages(prev => [...prev, { id: 'err-'+Date.now(), role: 'assistant', content: "⚠️ AI 連線發生錯誤。", timestamp: new Date() }]);
     } finally {
       setIsLoading(false);
     }
@@ -118,19 +132,18 @@ const App = () => {
       {/* API Key Modal */}
       {showKeyDialog && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
-          <div className="bg-white p-8 rounded-3xl w-full max-w-xs shadow-2xl animate-in fade-in zoom-in duration-300">
+          <div className="bg-white p-8 rounded-3xl w-full max-w-xs shadow-2xl">
             <h2 className="text-xl font-bold mb-4 text-[#00695C]">初始化助手</h2>
-            <p className="text-xs text-gray-500 mb-6 leading-relaxed">請輸入您的 Google Gemini API Key 以啟動 AI 引擎。金鑰將儲存於您的瀏覽器本地。</p>
             <input 
               type="password" 
-              className="w-full bg-[#F5F5F0] px-4 py-3 rounded-xl mb-4 text-sm focus:ring-2 focus:ring-[#00695C] outline-none" 
-              placeholder="貼上 API Key..."
+              className="w-full bg-[#F5F5F0] px-4 py-3 rounded-xl mb-4 text-sm outline-none" 
+              placeholder="貼上 Gemini API Key..."
               onChange={(e) => {
                 setApiKey(e.target.value);
                 localStorage.setItem('TCB_API_KEY', e.target.value);
               }}
             />
-            <button onClick={() => setShowKeyDialog(false)} className="w-full bg-[#00695C] text-white py-3.5 rounded-xl font-bold active:scale-95 transition-all">進入系統</button>
+            <button onClick={() => setShowKeyDialog(false)} className="w-full bg-[#00695C] text-white py-3.5 rounded-xl font-bold">進入系統</button>
           </div>
         </div>
       )}
@@ -141,16 +154,19 @@ const App = () => {
           <div className="w-8 h-8 bg-[#00695C] rounded-lg flex items-center justify-center text-white font-bold text-sm">合</div>
           <div>
             <h1 className="font-bold text-[#4A4A4A] text-sm leading-none">政策性貸款助手</h1>
-            <p className="text-[9px] text-gray-400 mt-1 uppercase tracking-tighter">114.12 Version Only</p>
+            <p className="text-[9px] text-gray-400 mt-1">114.12 Version</p>
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          {!isStandalone && (
-            <button onClick={handleInstall} className="text-[10px] bg-[#00695C]/10 text-[#00695C] px-3 py-1.5 rounded-full font-bold active:bg-[#00695C]/20 transition-colors">
-              安裝 App
+          {pwaStatus !== 'installed' && (
+            <button 
+              onClick={handleInstall} 
+              className={`text-[10px] px-3 py-1.5 rounded-full font-bold transition-colors ${pwaStatus === 'ready' ? 'bg-[#00695C] text-white' : 'bg-gray-100 text-gray-400'}`}
+            >
+              {pwaStatus === 'ready' ? '安裝 App' : '檢測中...'}
             </button>
           )}
-          <button onClick={() => fileInputRef.current.click()} className="p-2 bg-[#F1F1EB] rounded-full text-[#00695C] active:bg-[#E5E5E0]">
+          <button onClick={() => fileInputRef.current.click()} className="p-2 bg-[#F1F1EB] rounded-full text-[#00695C]">
              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
           </button>
           <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".docx" className="hidden" />
@@ -170,7 +186,7 @@ const App = () => {
         {isLoading && (
           <div className="flex justify-start">
              <div className="bg-white/50 border border-[#E5E5E0] px-4 py-2 rounded-full text-[10px] text-gray-400 animate-pulse">
-               AI 正在檢索規章並生成建議...
+               AI 正在思考...
              </div>
           </div>
         )}
@@ -184,18 +200,17 @@ const App = () => {
             onChange={e => setInput(e.target.value)}
             disabled={!knowledgeBase || isLoading}
             className="flex-1 bg-[#F5F5F0] px-4 py-3 rounded-xl outline-none text-sm placeholder:text-gray-400" 
-            placeholder={knowledgeBase ? "請輸入問題..." : "⚠️ 請先上傳規章 (.docx)"}
+            placeholder={knowledgeBase ? "請輸入問題..." : "⚠️ 請先上傳規章"}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
           />
           <button 
             onClick={handleSend} 
             disabled={!input.trim() || isLoading || !knowledgeBase}
-            className={`px-5 rounded-xl font-bold transition-all ${!input.trim() || isLoading || !knowledgeBase ? 'bg-gray-100 text-gray-300' : 'bg-[#00695C] text-white active:scale-95'}`}
+            className={`px-5 rounded-xl font-bold transition-all ${!input.trim() || isLoading || !knowledgeBase ? 'bg-gray-100 text-gray-300' : 'bg-[#00695C] text-white'}`}
           >
             發送
           </button>
         </div>
-        <p className="text-[9px] text-center text-gray-300 mt-3 font-light">僅限合庫行內規章查詢使用</p>
       </footer>
     </div>
   );

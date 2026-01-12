@@ -3,21 +3,28 @@
   "name": "合庫個金政策性貸款助手",
   "short_name": "合庫貸款",
   "description": "合庫 114.12 政策性貸款規章智能助理",
-  "id": "tcb-loan-pwa-v1",
-  "start_url": "./index.html",
+  "id": "/tcb-loan-app/",
+  "start_url": "index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#F9F9F4",
   "theme_color": "#00695C",
+  "background_color": "#F9F9F4",
+  "orientation": "portrait",
   "icons": [
     {
-      "src": "https://via.placeholder.com/192/00695C/FFFFFF?text=TCB",
+      "src": "https://via.placeholder.com/192x192/00695C/FFFFFF?text=TCB",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://via.placeholder.com/512/00695C/FFFFFF?text=TCB",
+      "src": "https://via.placeholder.com/192x192/00695C/FFFFFF?text=TCB",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "https://via.placeholder.com/512x512/00695C/FFFFFF?text=TCB",
       "sizes": "512x512",
       "type": "image/png"
     }

@@ -1,16 +1,17 @@
 
-const CACHE_NAME = 'tcb-loan-v2.2';
+const CACHE_NAME = 'tcb-loan-v3.0';
 const ASSETS_TO_CACHE = [
   './',
-  './index.html',
-  './manifest.json',
-  './index.jsx'
+  'index.html',
+  'manifest.json',
+  'index.jsx'
 ];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
+      console.log('Caching app shell');
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
@@ -26,6 +27,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// PWA 必須有 fetch 事件處理程序才能觸發安裝
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((response) => {
