@@ -1,11 +1,10 @@
 
-const CACHE_NAME = 'tcb-loan-v1.2';
+const CACHE_NAME = 'tcb-loan-v2.2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
-  'https://cdn.tailwindcss.com',
-  'https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap'
+  './index.jsx'
 ];
 
 self.addEventListener('install', (event) => {
